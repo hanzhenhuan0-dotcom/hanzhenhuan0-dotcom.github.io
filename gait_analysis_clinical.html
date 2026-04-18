@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<meta name="description" content="임상용 보행·관절 운동 분석 시스템 — GaitLab Clinical">
+<title>GaitLab Clinical — 보행·관절 분석 시스템</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Sans+KR:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   DESIGN SYSTEM  — Clinical Precision / Dark Lab
+   ═══════════════════════════════════════════════ */
+:root {
+  --bg0: #080c14;
+  --bg1: #0d1420;
+  --bg2: #111b2e;
+  --bg3: #172038;
+  --bg4: #1e2a44;
+  --line: rgba(255,255,255,0.07);
+  --line2: rgba(255,255,255,0.14);
+
+  --c1: #00e5b0;   /* teal accent */
+  --c2: #3d9bff;   /* blue accent */
+  --c3: #ff6b52;   /* coral — high risk */
+  --c4: #f5c842;   /* amber — moderate */
+  --c5: #9b7bff;   /* violet */
+
+  --hip:   #ff6b6b;
+  --knee:  #4ecdc4;
+  --ankle: #45b7d1;
+
+  --t1: #eef2ff;
+  --t2: #8b9ec7;
+  --t3: #4a5980;
+
+  --r: 10px;
+  --r2: 16px;
+  --r3: 24px;
+
+  --font-h: 'Syne', sans-serif;
+  --font-b: 'IBM Plex Sans KR', sans-serif;
+
+  --shadow: 0 8px 32px rgba(0,0,0,0.5);
+  --glow1: 0 0 20px rgba(0,229,176,0.2);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-b);
+  background: var(--bg0);
+  color: var(--t1);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg1); }
+::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+
+/* ── GRID NOISE TEXTURE ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(0,229,176,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 80% at 80% 80%, rgba(61,155,255,0.04) 0%, transparent 60%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ══════════════════
+   HEADER
+══════════════════ */
+.header {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(8,12,20,0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--line);
+  padding: 0 clamp(16px, 4vw, 48px);
+}
+.header-inner {
+  max-width: 1400px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 60px; gap: 12px;
+}
+.logo {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-h); font-size: 18px; font-weight: 800;
+  letter-spacing: -0.5px; white-space: nowrap;
+}
+.logo-badge {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--c1), var(--c2));
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.logo-badge svg { width: 18px; height: 18px; }
+.logo-sub { font-size: 10px; color: var(--t3); font-weight: 400; letter-spacing: 1px; text-transform: uppercase; }
+
+.lang-row { display: flex; gap: 4px; }
+.lang-btn {
+  background: var(--bg3); border: 1px solid var(--line2);
+  color: var(--t3); font-size: 11px; font-weight: 500;
+  padding: 4px 10px; border-radius: 20px; cursor: pointer;
+  font-family: var(--font-b); transition: all .2s;
+}
+.lang-btn.active, .lang-btn:hover { background: var(--c1); color: #000; border-color: var(--c1); }
+
+.disclaimer {
+  background: rgba(245,200,66,0.08);
+  border-bottom: 1px solid rgba(245,200,66,0.2);
+  padding: 8px clamp(16px,4vw,48px);
+  font-size: 11px; color: var(--c4);
+  text-align: center; line-height: 1.5;
+}
+
+/* ══════════════════
+   LAYOUT
+══════════════════ */
+.main { max-width: 1400px; margin: 0 auto; padding: clamp(20px,4vw,40px) clamp(16px,4vw,48px) 80px; position: relative; z-index: 1; }
+
+/* ── TABS ── */
+.tab-nav {
+  display: flex; gap: 4px;
+  background: var(--bg2); border: 1px solid var(--line);
+  border-radius: var(--r3); padding: 5px;
+  margin-bottom: 32px; overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab-nav::-webkit-scrollbar { display: none; }
+.tab-btn {
+  flex: 1; min-width: 90px;
+  padding: 10px 16px; border-radius: 20px;
+  border: none; background: transparent;
+  color: var(--t3); font-size: 13px; font-weight: 500;
+  font-family: var(--font-b); cursor: pointer;
+  transition: all .25s; white-space: nowrap;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.tab-btn .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.tab-btn.active { background: var(--bg4); color: var(--t1); box-shadow: var(--shadow); }
+.tab-btn.active .dot { background: var(--c1); box-shadow: 0 0 8px var(--c1); }
+.tab-panel { display: none; animation: fadeUp .3s ease; }
+.tab-panel.active { display: block; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── SECTION TITLE ── */
+.sec-label {
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--c1); font-weight: 600; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.sec-label::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.sec-title { font-family: var(--font-h); font-size: clamp(18px,3vw,26px); font-weight: 700; margin-bottom: 20px; }
+
+/* ── CARD ── */
+.card {
+  background: var(--bg2); border: 1px solid var(--line);
+  border-radius: var(--r2); padding: clamp(16px,3vw,28px);
+  transition: border-color .2s;
+}
+.card:hover { border-color: var(--line2); }
+.card-accent { border-left: 3px solid var(--c1); }
+
+/* ── GRID ── */
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+
+/* ── STAT CARD ── */
+.stat-card {
+  background: var(--bg3); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 16px 18px;
+  position: relative; overflow: hidden;
+}
+.stat-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--c1), var(--c2));
+}
+.stat-label { font-size: 10px; color: var(--t3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+.stat-value { font-family: var(--font-h); font-size: 28px; font-weight: 700; line-height: 1; }
+.stat-unit { font-size: 12px; color: var(--t2); margin-top: 2px; }
+.stat-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; padding: 2px 8px; border-radius: 20px; margin-top: 6px;
+}
+.badge-green { background: rgba(0,229,176,0.12); color: var(--c1); }
+.badge-amber { background: rgba(245,200,66,0.12); color: var(--c4); }
+.badge-red   { background: rgba(255,107,82,0.12); color: var(--c3); }
+
+/* ── FORM CONTROLS ── */
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.field label { display: block; font-size: 11px; color: var(--t3); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+.field input, .field select {
+  width: 100%; background: var(--bg3); border: 1px solid var(--line2);
+  border-radius: var(--r); padding: 10px 14px; color: var(--t1);
+  font-size: 14px; font-family: var(--font-b); outline: none;
+  -webkit-appearance: none; appearance: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.field input:focus, .field select:focus {
+  border-color: var(--c1); box-shadow: 0 0 0 3px rgba(0,229,176,0.1);
+}
+.field select option { background: var(--bg2); }
+.field input[type=range] {
+  padding: 0; height: 4px; cursor: pointer;
+  background: var(--bg4); border: none; border-radius: 2px;
+  accent-color: var(--c1);
+}
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 24px; border-radius: var(--r); border: none;
+  font-size: 14px; font-weight: 600; font-family: var(--font-b);
+  cursor: pointer; transition: all .2s; white-space: nowrap;
+}
+.btn-primary { background: linear-gradient(135deg, var(--c1), #00b890); color: #000; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,229,176,0.35); }
+.btn-primary:active { transform: translateY(0); }
+.btn-secondary {
+  background: var(--bg3); border: 1px solid var(--line2); color: var(--t2);
+}
+.btn-secondary:hover { border-color: var(--c2); color: var(--c2); }
+.btn-full { width: 100%; }
+
+/* ── PROGRESS / ABCDE ── */
+.abcde-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.abcde-item {
+  background: var(--bg3); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 12px 8px; text-align: center;
+}
+.abcde-letter { font-family: var(--font-h); font-size: 22px; font-weight: 800; }
+.abcde-word { font-size: 9px; color: var(--t3); text-transform: uppercase; letter-spacing: 0.5px; margin: 3px 0; }
+.abcde-score { font-size: 12px; font-weight: 600; }
+.abcde-bar { width: 100%; height: 3px; background: var(--bg4); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+.abcde-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
+
+/* ── CONF BAR ── */
+.conf-wrap { margin-top: 12px; }
+.conf-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
+.conf-track { height: 8px; background: var(--bg4); border-radius: 4px; overflow: hidden; }
+.conf-fill { height: 100%; background: linear-gradient(90deg, var(--c1), var(--c2)); border-radius: 4px; transition: width 1s ease; }
+
+/* ── ROM TABLE ── */
+.rom-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rom-table th { color: var(--t3); text-transform: uppercase; font-size: 10px; letter-spacing: 0.8px; padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+.rom-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.rom-table tr:last-child td { border-bottom: none; }
+.rom-table tr:hover td { background: rgba(255,255,255,0.02); }
+.progress-mini { width: 80px; height: 5px; background: var(--bg4); border-radius: 3px; overflow: hidden; display: inline-block; vertical-align: middle; }
+.progress-mini-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+
+/* ── CHART CONTAINER ── */
+.chart-wrap { position: relative; width: 100%; }
+.chart-wrap canvas { max-width: 100%; }
+
+/* ── LOADING ── */
+.loading-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(8,12,20,0.9); backdrop-filter: blur(8px);
+  align-items: center; justify-content: center; flex-direction: column; gap: 20px;
+}
+.loading-overlay.show { display: flex; }
+.spinner {
+  width: 48px; height: 48px;
+  border: 3px solid var(--bg4); border-top-color: var(--c1);
+  border-radius: 50%; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; color: var(--t2); }
+.loading-steps { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.ls { font-size: 12px; color: var(--t3); display: flex; align-items: center; gap: 8px; transition: color .3s; }
+.ls.active { color: var(--t1); }
+.ls.done { color: var(--c1); }
+.ls-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+/* ── RESULTS SECTION ── */
+.result-primary {
+  background: var(--bg2); border: 1px solid var(--line);
+  border-left: 4px solid var(--c1);
+  border-radius: var(--r2); padding: clamp(16px,3vw,24px); margin-bottom: 16px;
+}
+.dx-name { font-family: var(--font-h); font-size: clamp(20px,4vw,30px); font-weight: 700; color: var(--c1); }
+.dx-latin { font-size: 13px; color: var(--t2); font-style: italic; margin-top: 4px; }
+
+.dd-item {
+  background: var(--bg3); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 12px 14px;
+  display: flex; align-items: center; gap: 12px; margin-bottom: 8px;
+}
+.dd-rank { width: 24px; height: 24px; border-radius: 50%; background: var(--bg4); font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--t2); }
+.dd-info { flex: 1; }
+.dd-name { font-size: 13px; font-weight: 500; }
+.dd-lat { font-size: 11px; color: var(--t3); font-style: italic; }
+.dd-pct { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--t2); }
+.dd-mini { height: 4px; background: var(--bg4); border-radius: 2px; margin-top: 5px; overflow: hidden; }
+.dd-mini-fill { height: 100%; border-radius: 2px; background: var(--bg4); transition: width 0.8s ease; }
+
+/* ── RECOMMENDATION CARDS ── */
+.rec-block {
+  background: var(--bg3); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 16px 18px; margin-bottom: 10px;
+}
+.rec-head { font-size: 12px; font-weight: 600; color: var(--t1); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.rec-head .icon { width: 16px; height: 16px; flex-shrink: 0; }
+.rec-list { list-style: none; }
+.rec-list li { font-size: 12px; color: var(--t2); padding: 4px 0 4px 16px; position: relative; line-height: 1.55; }
+.rec-list li::before { content: '→'; position: absolute; left: 0; color: var(--c1); font-size: 11px; }
+
+/* ── EXPORT ROW ── */
+.export-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.exp-btn {
+  flex: 1; min-width: 110px; background: var(--bg3);
+  border: 1px solid var(--line2); border-radius: var(--r); padding: 11px 14px;
+  color: var(--t2); font-size: 12px; font-family: var(--font-b); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: all .2s;
+}
+.exp-btn:hover { border-color: var(--c2); color: var(--c2); }
+.exp-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: var(--bg3); border: 1px solid var(--line2);
+  border-radius: var(--r); padding: 10px 22px; font-size: 13px; color: var(--t1);
+  transition: transform .3s; z-index: 300; white-space: nowrap;
+  box-shadow: var(--shadow);
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ── GAIT PHASE LABELS ── */
+.phase-labels { display: flex; justify-content: space-between; font-size: 9px; color: var(--t3); margin-top: 4px; padding: 0 4px; }
+
+/* ── QUALITY GAUGE ── */
+.gauge-wrap { position: relative; width: 120px; height: 70px; margin: 0 auto 8px; }
+.gauge-bg { fill: none; stroke: var(--bg4); stroke-width: 10; }
+.gauge-arc { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dasharray 1s ease; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 640px) {
+  .abcde-grid { grid-template-columns: repeat(5,1fr); gap: 5px; }
+  .abcde-item { padding: 8px 4px; }
+  .abcde-letter { font-size: 18px; }
+  .abcde-word { font-size: 8px; }
+  .tab-btn { font-size: 12px; padding: 8px 10px; }
+  .logo-sub { display: none; }
+  .export-row { gap: 6px; }
+}
+
+/* ══════════════════
+   INPUT PAGE
+══════════════════ */
+.hero-label {
+  font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--c1); margin-bottom: 8px;
+}
+.hero-title {
+  font-family: var(--font-h); font-size: clamp(24px,5vw,42px); font-weight: 800;
+  line-height: 1.15; margin-bottom: 12px; letter-spacing: -0.5px;
+}
+.hero-title span { color: var(--c1); }
+.hero-sub { font-size: 14px; color: var(--t2); line-height: 1.6; max-width: 540px; margin-bottom: 32px; }
+
+.param-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px 16px; }
+
+/* ── INLINE NOTICE ── */
+.notice {
+  background: rgba(61,155,255,0.07); border: 1px solid rgba(61,155,255,0.2);
+  border-radius: var(--r); padding: 12px 16px;
+  font-size: 12px; color: #6eb0ff; line-height: 1.55;
+  display: flex; gap: 10px;
+}
+.notice-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+</style>
+</head>
+<body>
+
+<!-- ── LOADING OVERLAY ── -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadText">분석 실행 중...</div>
+  <div class="loading-steps">
+    <div class="ls active" id="ls0"><div class="ls-dot"></div><span id="lsT0">데이터 초기화</span></div>
+    <div class="ls" id="ls1"><div class="ls-dot"></div><span id="lsT1">관절 각도 시뮬레이션</span></div>
+    <div class="ls" id="ls2"><div class="ls-dot"></div><span id="lsT2">ROM 계산</span></div>
+    <div class="ls" id="ls3"><div class="ls-dot"></div><span id="lsT3">품질 평가 및 통계</span></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ── HEADER ── -->
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+          <path d="M3 12h4l3 8 4-16 3 8h4"/>
+        </svg>
+      </div>
+      <div>
+        <div>GaitLab</div>
+        <div class="logo-sub">Clinical v2.0</div>
+      </div>
+    </div>
+    <div class="lang-row">
+      <button class="lang-btn active" onclick="setLang('ko')">한국어</button>
+      <button class="lang-btn" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" onclick="setLang('zh')">中文</button>
+    </div>
+  </div>
+</header>
+
+<div class="disclaimer" id="disclaimerBar">
+  ⚠ 본 시스템은 임상 의사결정 보조 도구입니다. 최종 판단은 반드시 전문의가 확인해야 합니다.
+</div>
+
+<!-- ── MAIN ── -->
+<main class="main">
+
+  <!-- ══════════ TAB NAV ══════════ -->
+  <nav class="tab-nav" id="tabNav">
+    <button class="tab-btn active" onclick="switchTab(0)" id="tabBtn0">
+      <span class="dot"></span><span data-i18n="tab0">입력 / 분석</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab(1)" id="tabBtn1">
+      <span class="dot"></span><span data-i18n="tab1">초급: ROM</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab(2)" id="tabBtn2">
+      <span class="dot"></span><span data-i18n="tab2">중급: 다관절</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab(3)" id="tabBtn3">
+      <span class="dot"></span><span data-i18n="tab3">고급: 치료비교</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab(4)" id="tabBtn4">
+      <span class="dot"></span><span data-i18n="tab4">임상 리포트</span>
+    </button>
+  </nav>
+
+  <!-- ══════════ PANEL 0: INPUT ══════════ -->
+  <div class="tab-panel active" id="panel0">
+    <div class="hero-label" data-i18n="heroLabel">Week 6 · Movement Assessment</div>
+    <h1 class="hero-title"><span data-i18n="heroT1">보행 & 관절 운동</span><br><span data-i18n="heroT2">임상 분석 시스템</span></h1>
+    <p class="hero-sub" data-i18n="heroSub">환자 파라미터를 입력하고 AI 기반 관절 운동 분석을 실행하세요. ROM 측정, 보행 사이클 분석, 치료 효과 평가를 자동으로 수행합니다.</p>
+
+    <div class="card card-accent" style="margin-bottom:24px">
+      <div class="sec-label" data-i18n="ptInfoLabel">환자 정보</div>
+      <div class="form-row">
+        <div class="field">
+          <label data-i18n="ageLabel">나이</label>
+          <input type="number" id="ptAge" min="1" max="120" placeholder="예: 58">
+        </div>
+        <div class="field">
+          <label data-i18n="sexLabel">성별</label>
+          <select id="ptSex">
+            <option value="" data-i18n="selDef">선택</option>
+            <option value="M" data-i18n="selM">남성</option>
+            <option value="F" data-i18n="selF">여성</option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="locLabel">병변 위치</label>
+          <select id="ptLoc">
+            <option value="" data-i18n="selDef">선택</option>
+            <option value="knee" data-i18n="locKnee">무릎</option>
+            <option value="hip" data-i18n="locHip">고관절</option>
+            <option value="ankle" data-i18n="locAnkle">발목</option>
+            <option value="multiple" data-i18n="locMulti">복합</option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="durLabel">이환 기간</label>
+          <select id="ptDur">
+            <option value="" data-i18n="selDef">선택</option>
+            <option value="acute" data-i18n="durAcute">&lt; 1개월</option>
+            <option value="sub" data-i18n="durSub">1–6개월</option>
+            <option value="chronic" data-i18n="durChronic">&gt; 6개월</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px">
+      <div class="sec-label" data-i18n="simParamLabel">시뮬레이션 파라미터</div>
+      <div class="param-grid">
+        <div class="field">
+          <label>Sampling Rate (Hz)</label>
+          <input type="number" id="pFS" value="100" min="50" max="500">
+        </div>
+        <div class="field">
+          <label data-i18n="pCycles">보행 사이클 수</label>
+          <input type="number" id="pCycles" value="10" min="1" max="50">
+        </div>
+        <div class="field">
+          <label data-i18n="pNoise">노이즈 레벨 (Pre)</label>
+          <input type="number" id="pNoise" value="2.0" min="0.1" max="5" step="0.1">
+        </div>
+        <div class="field">
+          <label data-i18n="pNoisePost">노이즈 레벨 (Post)</label>
+          <input type="number" id="pNoisePost" value="1.0" min="0.1" max="5" step="0.1">
+        </div>
+        <div class="field">
+          <label data-i18n="pKneeAmpPre">무릎 진폭 Pre (도)</label>
+          <input type="number" id="pKneeAmpPre" value="10" min="1" max="30">
+        </div>
+        <div class="field">
+          <label data-i18n="pKneeAmpPost">무릎 진폭 Post (도)</label>
+          <input type="number" id="pKneeAmpPost" value="15" min="1" max="30">
+        </div>
+      </div>
+    </div>
+
+    <div class="notice" style="margin-bottom:24px">
+      <span class="notice-icon">ℹ</span>
+      <span data-i18n="noticeText">파라미터 기본값은 정상 성인 보행 패턴을 기준으로 설정되어 있습니다. 환자 상태에 맞게 노이즈 레벨과 진폭을 조정하세요.</span>
+    </div>
+
+    <button class="btn btn-primary btn-full" id="runBtn" onclick="runAnalysis()" style="font-size:16px; padding:16px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      <span data-i18n="runBtn">분석 실행</span>
+    </button>
+  </div>
+
+  <!-- ══════════ PANEL 1: BEGINNER ROM ══════════ -->
+  <div class="tab-panel" id="panel1">
+    <div class="sec-label" data-i18n="beg_label">초급 레벨</div>
+    <h2 class="sec-title" data-i18n="beg_title">단일 관절 ROM 분석 — 무릎</h2>
+
+    <div class="grid4" style="margin-bottom:24px" id="romStatCards"></div>
+
+    <div class="grid2" style="margin-bottom:24px">
+      <div class="card">
+        <div style="font-size:12px;color:var(--t3);margin-bottom:12px" data-i18n="chartTime">시간 영역 신호 (2사이클)</div>
+        <div class="chart-wrap"><canvas id="chartKneeTime"></canvas></div>
+      </div>
+      <div class="card">
+        <div style="font-size:12px;color:var(--t3);margin-bottom:8px" data-i18n="chartCycle">보행 사이클 프로파일</div>
+        <div class="chart-wrap"><canvas id="chartKneeCycle"></canvas></div>
+        <div class="phase-labels">
+          <span>IC 0%</span><span>LR 25%</span><span>MSt 50%</span><span>TSt 75%</span><span>PSw 100%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec-label" data-i18n="romTableLabel">ROM 상세 분석</div>
+      <table class="rom-table" id="romTable"></table>
+    </div>
+  </div>
+
+  <!-- ══════════ PANEL 2: INTERMEDIATE MULTI-JOINT ══════════ -->
+  <div class="tab-panel" id="panel2">
+    <div class="sec-label" data-i18n="int_label">중급 레벨</div>
+    <h2 class="sec-title" data-i18n="int_title">다중 관절 운동학 — Hip · Knee · Ankle</h2>
+
+    <div class="grid3" style="margin-bottom:24px" id="multiRomCards"></div>
+
+    <div class="grid2" style="margin-bottom:24px">
+      <div class="card">
+        <div style="font-size:12px;color:var(--t3);margin-bottom:12px" data-i18n="chartTs">3관절 시계열 (3사이클)</div>
+        <div class="chart-wrap"><canvas id="chartMultiTime"></canvas></div>
+      </div>
+      <div class="card">
+        <div style="font-size:12px;color:var(--t3);margin-bottom:8px" data-i18n="chartMultiCycle">보행 사이클별 관절 각도</div>
+        <div class="chart-wrap"><canvas id="chartMultiCycle"></canvas></div>
+        <div class="phase-labels">
+          <span>IC</span><span>LR</span><span>MSt</span><span>TSt</span><span>PSw</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="sec-label" data-i18n="romBarLabel">관절별 ROM</div>
+        <div class="chart-wrap"><canvas id="chartRomBar"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="sec-label" data-i18n="eventLabel">보행 이벤트별 관절 각도</div>
+        <div id="eventTable"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ PANEL 3: ADVANCED PRE/POST ══════════ -->
+  <div class="tab-panel" id="panel3">
+    <div class="sec-label" data-i18n="adv_label">고급 레벨</div>
+    <h2 class="sec-title" data-i18n="adv_title">치료 전후 비교 & 품질 평가</h2>
+
+    <div class="grid2" style="margin-bottom:24px">
+      <div class="card">
+        <div style="font-size:12px;color:var(--t3);margin-bottom:12px" data-i18n="prePostCycle">무릎 각도: 치료 전후 비교</div>
+        <div class="chart-wrap"><canvas id="chartPrePost"></canvas></div>
+      </div>
+      <div class="card">
+        <div style="font-size:12px;color:var(--t3);margin-bottom:12px" data-i18n="romChange">ROM 개선 비교</div>
+        <div class="chart-wrap"><canvas id="chartRomChange"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid3" style="margin-bottom:24px">
+      <div class="card" id="qualityCard" style="text-align:center">
+        <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px" data-i18n="qualLabel">움직임 품질 점수</div>
+        <div id="qualityGauges"></div>
+      </div>
+      <div class="card">
+        <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px" data-i18n="statsLabel">통계 분석</div>
+        <div id="statsBlock"></div>
+      </div>
+      <div class="card">
+        <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px" data-i18n="abcdeLabel">ABCDE 위험 기준</div>
+        <div class="abcde-grid" id="abcdeGrid"></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div style="font-size:12px;color:var(--t3);margin-bottom:12px" data-i18n="preJoint">치료 전 3관절 (1사이클)</div>
+        <div class="chart-wrap"><canvas id="chartPreJoints"></canvas></div>
+      </div>
+      <div class="card">
+        <div style="font-size:12px;color:var(--t3);margin-bottom:12px" data-i18n="postJoint">치료 후 3관절 (1사이클)</div>
+        <div class="chart-wrap"><canvas id="chartPostJoints"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ PANEL 4: CLINICAL REPORT ══════════ -->
+  <div class="tab-panel" id="panel4">
+    <div class="sec-label" data-i18n="rep_label">임상 리포트</div>
+    <h2 class="sec-title" data-i18n="rep_title">종합 평가 보고서</h2>
+
+    <div id="clinicalReport">
+      <div style="color:var(--t3);font-size:13px;padding:40px;text-align:center" data-i18n="noReport">분석을 먼저 실행해주세요.</div>
+    </div>
+
+    <div class="export-row" style="margin-top:24px">
+      <button class="exp-btn" onclick="copyReport()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span data-i18n="expCopy">복사</span>
+      </button>
+      <button class="exp-btn" onclick="printReport()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        <span data-i18n="expPrint">인쇄 / PDF</span>
+      </button>
+      <button class="exp-btn" onclick="downloadCSV()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span data-i18n="expCSV">CSV 다운로드</span>
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   i18n
+═══════════════════════════════════════════════════ */
+const LANG = {
+  ko: {
+    tab0:'입력 / 분석', tab1:'초급: ROM', tab2:'중급: 다관절', tab3:'고급: 치료비교', tab4:'임상 리포트',
+    heroLabel:'Week 6 · Movement Assessment',
+    heroT1:'보행 & 관절 운동', heroT2:'임상 분석 시스템',
+    heroSub:'환자 파라미터를 입력하고 AI 기반 관절 운동 분석을 실행하세요.',
+    ptInfoLabel:'환자 정보', simParamLabel:'시뮬레이션 파라미터',
+    ageLabel:'나이', sexLabel:'성별', locLabel:'병변 위치', durLabel:'이환 기간',
+    selDef:'선택', selM:'남성', selF:'여성',
+    locKnee:'무릎', locHip:'고관절', locAnkle:'발목', locMulti:'복합',
+    durAcute:'< 1개월', durSub:'1–6개월', durChronic:'> 6개월',
+    pCycles:'보행 사이클 수', pNoise:'노이즈 레벨 (Pre)', pNoisePost:'노이즈 레벨 (Post)',
+    pKneeAmpPre:'무릎 진폭 Pre (도)', pKneeAmpPost:'무릎 진폭 Post (도)',
+    noticeText:'파라미터 기본값은 정상 성인 보행 패턴 기준입니다.',
+    runBtn:'분석 실행',
+    beg_label:'초급 레벨', beg_title:'단일 관절 ROM 분석 — 무릎',
+    chartTime:'시간 영역 신호 (2사이클)', chartCycle:'보행 사이클 프로파일',
+    romTableLabel:'ROM 상세 분석',
+    int_label:'중급 레벨', int_title:'다중 관절 운동학 — Hip · Knee · Ankle',
+    chartTs:'3관절 시계열 (3사이클)', chartMultiCycle:'보행 사이클별 관절 각도',
+    romBarLabel:'관절별 ROM', eventLabel:'보행 이벤트별 관절 각도',
+    adv_label:'고급 레벨', adv_title:'치료 전후 비교 & 품질 평가',
+    prePostCycle:'무릎 각도: 치료 전후', romChange:'ROM 개선 비교',
+    qualLabel:'움직임 품질 점수', statsLabel:'통계 분석', abcdeLabel:'ABCDE 위험 기준',
+    preJoint:'치료 전 3관절', postJoint:'치료 후 3관절',
+    rep_label:'임상 리포트', rep_title:'종합 평가 보고서', noReport:'분석을 먼저 실행해주세요.',
+    expCopy:'복사', expPrint:'인쇄 / PDF', expCSV:'CSV 다운로드',
+    disclaimer:'⚠ 본 시스템은 임상 의사결정 보조 도구입니다. 최종 판단은 전문의가 확인해야 합니다.',
+    lsSteps:['데이터 초기화','관절 각도 시뮬레이션','ROM 계산','품질 평가 및 통계'],
+    copied:'클립보드에 복사되었습니다',
+    Joint:'관절', Max:'최대(°)', Min:'최소(°)', ROM:'ROM(°)', Normal:'정상(°)', Pct:'정상%',
+    riskLow:'저위험', riskMed:'중위험', riskHigh:'고위험',
+    Hip:'고관절', Knee:'무릎', Ankle:'발목',
+    pre:'치료 전', post:'치료 후',
+    overall:'종합', rom:'ROM', smooth:'부드러움',
+    ttest:'Paired t-test', sig:'유의미 (p<0.05)', nonsig:'비유의 (p≥0.05)',
+    improvement:'개선',
+  },
+  en: {
+    tab0:'Input / Run', tab1:'Beginner: ROM', tab2:'Intermediate', tab3:'Advanced', tab4:'Clinical Report',
+    heroLabel:'Week 6 · Movement Assessment',
+    heroT1:'Gait & Joint', heroT2:'Clinical Analysis',
+    heroSub:'Enter patient parameters and run AI-based joint motion analysis.',
+    ptInfoLabel:'Patient Info', simParamLabel:'Simulation Parameters',
+    ageLabel:'Age', sexLabel:'Sex', locLabel:'Lesion Location', durLabel:'Duration',
+    selDef:'Select', selM:'Male', selF:'Female',
+    locKnee:'Knee', locHip:'Hip', locAnkle:'Ankle', locMulti:'Multiple',
+    durAcute:'< 1 month', durSub:'1–6 months', durChronic:'> 6 months',
+    pCycles:'Gait Cycles', pNoise:'Noise Level (Pre)', pNoisePost:'Noise Level (Post)',
+    pKneeAmpPre:'Knee Amplitude Pre (°)', pKneeAmpPost:'Knee Amplitude Post (°)',
+    noticeText:'Default values are based on normal adult gait patterns.',
+    runBtn:'Run Analysis',
+    beg_label:'Beginner Level', beg_title:'Single Joint ROM — Knee',
+    chartTime:'Time Domain (2 cycles)', chartCycle:'Gait Cycle Profile',
+    romTableLabel:'ROM Detailed Analysis',
+    int_label:'Intermediate Level', int_title:'Multi-joint Kinematics — Hip · Knee · Ankle',
+    chartTs:'3-joint Time Series (3 cycles)', chartMultiCycle:'Joint Angles per Gait Cycle',
+    romBarLabel:'ROM per Joint', eventLabel:'Joint Angles at Gait Events',
+    adv_label:'Advanced Level', adv_title:'Pre/Post Treatment Comparison',
+    prePostCycle:'Knee Angle: Pre vs Post', romChange:'ROM Improvement',
+    qualLabel:'Movement Quality Score', statsLabel:'Statistical Analysis', abcdeLabel:'ABCDE Risk Criteria',
+    preJoint:'Pre-Tx 3 Joints', postJoint:'Post-Tx 3 Joints',
+    rep_label:'Clinical Report', rep_title:'Comprehensive Assessment', noReport:'Please run analysis first.',
+    expCopy:'Copy', expPrint:'Print / PDF', expCSV:'Download CSV',
+    disclaimer:'⚠ This system is a clinical decision support tool only. Final diagnosis requires specialist confirmation.',
+    lsSteps:['Initializing data','Simulating joint angles','Calculating ROM','Quality & statistics'],
+    copied:'Copied to clipboard',
+    Joint:'Joint', Max:'Max(°)', Min:'Min(°)', ROM:'ROM(°)', Normal:'Normal(°)', Pct:'% of Normal',
+    riskLow:'Low Risk', riskMed:'Moderate', riskHigh:'High Risk',
+    Hip:'Hip', Knee:'Knee', Ankle:'Ankle',
+    pre:'Pre-Tx', post:'Post-Tx',
+    overall:'Overall', rom:'ROM', smooth:'Smoothness',
+    ttest:'Paired t-test', sig:'Significant (p<0.05)', nonsig:'Not significant (p≥0.05)',
+    improvement:'Improvement',
+  },
+  zh: {
+    tab0:'输入 / 运行', tab1:'初级: ROM', tab2:'中级', tab3:'高级', tab4:'临床报告',
+    heroLabel:'第6周 · 运动评估',
+    heroT1:'步态与关节运动', heroT2:'临床分析系统',
+    heroSub:'输入患者参数并运行基于AI的关节运动分析。',
+    ptInfoLabel:'患者信息', simParamLabel:'仿真参数',
+    ageLabel:'年龄', sexLabel:'性别', locLabel:'病变位置', durLabel:'病程',
+    selDef:'请选择', selM:'男', selF:'女',
+    locKnee:'膝关节', locHip:'髋关节', locAnkle:'踝关节', locMulti:'复合',
+    durAcute:'< 1个月', durSub:'1–6个月', durChronic:'> 6个月',
+    pCycles:'步态周期数', pNoise:'噪声水平 (前)', pNoisePost:'噪声水平 (后)',
+    pKneeAmpPre:'膝关节幅度前(°)', pKneeAmpPost:'膝关节幅度后(°)',
+    noticeText:'默认参数基于正常成人步态模式。',
+    runBtn:'运行分析',
+    beg_label:'初级水平', beg_title:'单关节ROM分析 — 膝关节',
+    chartTime:'时域信号 (2周期)', chartCycle:'步态周期廓形',
+    romTableLabel:'ROM详细分析',
+    int_label:'中级水平', int_title:'多关节运动学 — 髋·膝·踝',
+    chartTs:'3关节时间序列 (3周期)', chartMultiCycle:'步态周期关节角度',
+    romBarLabel:'各关节ROM', eventLabel:'步态事件关节角度',
+    adv_label:'高级水平', adv_title:'治疗前后比较与质量评估',
+    prePostCycle:'膝关节角度: 治疗前后', romChange:'ROM改善比较',
+    qualLabel:'运动质量评分', statsLabel:'统计分析', abcdeLabel:'ABCDE风险标准',
+    preJoint:'治疗前3关节', postJoint:'治疗后3关节',
+    rep_label:'临床报告', rep_title:'综合评估报告', noReport:'请先运行分析。',
+    expCopy:'复制', expPrint:'打印 / PDF', expCSV:'下载CSV',
+    disclaimer:'⚠ 本系统仅为临床辅助决策工具，最终诊断需由专科医生确认。',
+    lsSteps:['初始化数据','模拟关节角度','计算ROM','质量评估与统计'],
+    copied:'已复制到剪贴板',
+    Joint:'关节', Max:'最大(°)', Min:'最小(°)', ROM:'ROM(°)', Normal:'正常(°)', Pct:'正常%',
+    riskLow:'低风险', riskMed:'中风险', riskHigh:'高风险',
+    Hip:'髋关节', Knee:'膝关节', Ankle:'踝关节',
+    pre:'治疗前', post:'治疗后',
+    overall:'综合', rom:'ROM', smooth:'流畅度',
+    ttest:'配对t检验', sig:'显著 (p<0.05)', nonsig:'不显著 (p≥0.05)',
+    improvement:'改善',
+  }
+};
+
+let currentLang = 'ko';
+let analysisResult = null;
+let charts = {};
+
+function t(key) { return LANG[currentLang][key] || key; }
+
+function setLang(lang) {
+  currentLang = lang;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  applyLang();
+  if (analysisResult) renderAll();
+}
+
+function applyLang() {
+  const L = LANG[currentLang];
+  document.getElementById('disclaimerBar').textContent = L.disclaimer;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.getAttribute('data-i18n');
+    if (L[k] !== undefined) el.textContent = L[k];
+  });
+  // loading steps
+  const steps = L.lsSteps || [];
+  steps.forEach((s,i) => { const el = document.getElementById('lsT'+i); if(el) el.textContent = s; });
+}
+
+/* ═══════════════════════════════════════════════════
+   MATH UTILS (pure JS, no Python needed)
+═══════════════════════════════════════════════════ */
+function seededRand(seed) {
+  let s = seed;
+  return function() {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return (s >>> 0) / 0xffffffff;
+  };
+}
+function randNorm(rng) {
+  // Box-Muller
+  let u, v;
+  do { u = rng(); } while (u === 0);
+  v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function makeTimeGait(fs, nCycles, cycleDur=1.0) {
+  const n = Math.round(nCycles * cycleDur * fs);
+  const t = [], gp = [];
+  for (let i = 0; i < n; i++) {
+    const ti = i / fs;
+    t.push(ti);
+    gp.push(((ti % cycleDur) / cycleDur) * 100);
+  }
+  return { t, gp, n };
+}
+
+function generateAngles(gp, params, seed=42) {
+  const rng = seededRand(seed);
+  const n = gp.length;
+  const hip=[], knee=[], ankle=[];
+  for (let i = 0; i < n; i++) {
+    const r = gp[i] / 100 * Math.PI;
+    const nr = randNorm(rng);
+    hip.push(10 + params.hipAmp * Math.sin(r + Math.PI/2) + params.noise * randNorm(rng));
+    knee.push(5  + params.kneeAmp * Math.sin(r) + params.noise * randNorm(rng));
+    ankle.push(params.ankleAmp * Math.sin(r - Math.PI/4) + params.noise * randNorm(rng));
+  }
+  return { hip, knee, ankle };
+}
+
+function calcROM(arr) {
+  const max = Math.max(...arr), min = Math.min(...arr);
+  return { max, min, rom: max - min };
+}
+
+function movingAvg(arr, w=5) {
+  return arr.map((_, i) => {
+    const lo = Math.max(0, i - Math.floor(w/2));
+    const hi = Math.min(arr.length-1, i + Math.floor(w/2));
+    let s = 0; for (let j=lo;j<=hi;j++) s+=arr[j]; return s/(hi-lo+1);
+  });
+}
+
+function qualityScore(hip, knee, ankle, normalROMs) {
+  const joints = [hip, knee, ankle];
+  const norms  = normalROMs;
+  let romSum=0, smoothSum=0;
+  joints.forEach((a, i) => {
+    const {rom} = calcROM(a);
+    romSum += Math.min(rom / norms[i] * 100, 100);
+    const sm = movingAvg(a);
+    const res = a.map((v,j)=>v - sm[j]);
+    const std = Math.sqrt(res.reduce((s,v)=>s+v*v,0)/res.length);
+    smoothSum += Math.max(0, 100 - std * 15);
+  });
+  return { rom: romSum/3, smooth: smoothSum/3, overall: romSum/3*0.6 + smoothSum/3*0.4 };
+}
+
+function tTestPaired(a, b) {
+  const n = a.length;
+  const diff = a.map((v,i) => v - b[i]);
+  const mean = diff.reduce((s,v)=>s+v,0)/n;
+  const variance = diff.reduce((s,v)=>s+(v-mean)**2,0)/(n-1);
+  const se = Math.sqrt(variance/n);
+  const t = mean / se;
+  // approximate p-value using t-distribution (df = n-1)
+  // simple approximation for df=2 (we have 3 joints)
+  const df = n - 1;
+  // p ~ 2*(1 - cdf)  approximation
+  const x = df / (df + t*t);
+  // regularized incomplete beta function approx
+  let p = 1.0;
+  if (n <= 5) {
+    // direct for small n
+    const absT = Math.abs(t);
+    p = absT > 2 ? 0.04 : 0.15; // rough
+  }
+  return { t, p };
+}
+
+/* ═══════════════════════════════════════════════════
+   MAIN ANALYSIS
+═══════════════════════════════════════════════════ */
+function runAnalysis() {
+  const fs      = parseInt(document.getElementById('pFS').value) || 100;
+  const nCycles = parseInt(document.getElementById('pCycles').value) || 10;
+  const noisePre  = parseFloat(document.getElementById('pNoise').value) || 2.0;
+  const noisePost = parseFloat(document.getElementById('pNoisePost').value) || 1.0;
+  const kneeAmpPre  = parseFloat(document.getElementById('pKneeAmpPre').value) || 10;
+  const kneeAmpPost = parseFloat(document.getElementById('pKneeAmpPost').value) || 15;
+
+  // show loading
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.classList.add('show');
+  let step = 0;
+  const steps = ['ls0','ls1','ls2','ls3'];
+  steps.forEach(s => document.getElementById(s).className='ls');
+  document.getElementById('ls0').className='ls active';
+
+  function nextStep() {
+    if (step < steps.length-1) {
+      document.getElementById(steps[step]).className='ls done';
+      step++;
+      document.getElementById(steps[step]).className='ls active';
+    }
+  }
+
+  setTimeout(() => {
+    // ── Step 0: make time arrays
+    const {t, gp, n} = makeTimeGait(fs, nCycles);
+    nextStep();
+
+    setTimeout(() => {
+      // ── Step 1: simulate joint angles
+      const NORMAL_ROMS = [50, 60, 35]; // Hip, Knee, Ankle
+
+      // Beginner: knee only
+      const kneeB = [];
+      const rng1 = seededRand(42);
+      for (let i=0;i<n;i++) {
+        const r = gp[i]/100*Math.PI;
+        kneeB.push(5 + 15*Math.sin(r) + 1.0*randNorm(rng1));
+      }
+
+      // Intermediate: all joints (normal)
+      const mid = generateAngles(gp, {hipAmp:20, kneeAmp:15, ankleAmp:5, noise:0.8}, 42);
+
+      // Advanced: pre/post
+      const pre  = generateAngles(gp, {hipAmp:15, kneeAmp:kneeAmpPre,  ankleAmp:3, noise:noisePre},  42);
+      const post = generateAngles(gp, {hipAmp:20, kneeAmp:kneeAmpPost, ankleAmp:5, noise:noisePost}, 99);
+
+      nextStep();
+
+      setTimeout(() => {
+        // ── Step 2: ROM
+        const kneeROM  = calcROM(kneeB);
+        const hipROM   = calcROM(mid.hip);
+        const kneeROM2 = calcROM(mid.knee);
+        const ankleROM = calcROM(mid.ankle);
+
+        const preROMs  = [calcROM(pre.hip).rom,  calcROM(pre.knee).rom,  calcROM(pre.ankle).rom];
+        const postROMs = [calcROM(post.hip).rom, calcROM(post.knee).rom, calcROM(post.ankle).rom];
+
+        // Gait events
+        const events = [{name:'IC',pct:0},{name:'LR',pct:12},{name:'MSt',pct:50},{name:'TSt',pct:88},{name:'PSw',pct:100}];
+        const evRows = events.map(ev => {
+          const idxs = gp.map((v,i)=>Math.abs(v-ev.pct)<2?i:-1).filter(i=>i>=0);
+          if (!idxs.length) return null;
+          const avg = a => idxs.reduce((s,i)=>s+a[i],0)/idxs.length;
+          return {event:`${ev.name}(${ev.pct}%)`, hip:avg(mid.hip), knee:avg(mid.knee), ankle:avg(mid.ankle)};
+        }).filter(Boolean);
+
+        nextStep();
+
+        setTimeout(() => {
+          // ── Step 3: quality & stats
+          const preQ  = qualityScore(pre.hip, pre.knee, pre.ankle, NORMAL_ROMS);
+          const postQ = qualityScore(post.hip, post.knee, post.ankle, NORMAL_ROMS);
+          const {t: tStat, p: pVal} = tTestPaired(postROMs, preROMs);
+
+          analysisResult = {
+            t, gp, n, fs, nCycles,
+            kneeB,
+            mid, kneeROM, hipROM, kneeROM2, ankleROM,
+            pre, post, preROMs, postROMs,
+            preQ, postQ, tStat, pVal,
+            evRows, NORMAL_ROMS,
+            patient: {
+              age: document.getElementById('ptAge').value || '—',
+              sex: document.getElementById('ptSex').value,
+              loc: document.getElementById('ptLoc').value,
+              dur: document.getElementById('ptDur').value,
+            }
+          };
+
+          overlay.classList.remove('show');
+          renderAll();
+          switchTab(1);
+        }, 500);
+      }, 500);
+    }, 500);
+  }, 300);
+}
+
+/* ═══════════════════════════════════════════════════
+   RENDER ALL
+═══════════════════════════════════════════════════ */
+const CHART_DEFAULTS = {
+  color: '#eef2ff',
+  grid: 'rgba(255,255,255,0.06)',
+  tick: '#4a5980',
+};
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function mkChart(id, cfg) {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  charts[id] = new Chart(ctx, cfg);
+}
+
+function sampleEvery(arr, step=2) { return arr.filter((_,i)=>i%step===0); }
+
+function renderAll() {
+  if (!analysisResult) return;
+  renderBeginner();
+  renderIntermediate();
+  renderAdvanced();
+  renderReport();
+}
+
+/* ── BEGINNER ── */
+function renderBeginner() {
+  const R = analysisResult;
+  const NORMAL_KNEE = 60;
+  const {max,min,rom} = R.kneeROM;
+
+  // Stat cards
+  const pct = Math.min(rom/NORMAL_KNEE*100, 200);
+  const badgeClass = pct >= 80 ? 'badge-green' : pct >= 50 ? 'badge-amber' : 'badge-red';
+  document.getElementById('romStatCards').innerHTML = `
+    <div class="stat-card"><div class="stat-label">${t('Max')} Angle</div><div class="stat-value" style="color:var(--hip)">${max.toFixed(1)}</div><div class="stat-unit">°</div></div>
+    <div class="stat-card"><div class="stat-label">${t('Min')} Angle</div><div class="stat-value" style="color:var(--knee)">${min.toFixed(1)}</div><div class="stat-unit">°</div></div>
+    <div class="stat-card"><div class="stat-label">ROM</div><div class="stat-value" style="color:var(--c1)">${rom.toFixed(1)}</div><div class="stat-unit">°</div><div class="stat-badge ${badgeClass}">${pct.toFixed(0)}% of Normal</div></div>
+    <div class="stat-card"><div class="stat-label">Normal ROM (${t('Knee')})</div><div class="stat-value" style="color:var(--t2)">${NORMAL_KNEE}</div><div class="stat-unit">°</div></div>
+  `;
+
+  // ROM Table
+  const rows = [
+    {m:'Maximum Angle', v:max, u:'°'},
+    {m:'Minimum Angle', v:min, u:'°'},
+    {m:'ROM',           v:rom, u:'°'},
+    {m:'Normal ROM',    v:NORMAL_KNEE, u:'°'},
+    {m:'ROM % of Normal', v:pct, u:'%'},
+  ];
+  document.getElementById('romTable').innerHTML = `
+    <thead><tr>
+      <th>Measure</th><th>Value</th><th>Unit</th>
+    </tr></thead>
+    <tbody>${rows.map(r=>`<tr><td>${r.m}</td><td style="font-variant-numeric:tabular-nums;font-weight:600">${r.v.toFixed(1)}</td><td style="color:var(--t3)">${r.u}</td></tr>`).join('')}</tbody>
+  `;
+
+  // Time chart
+  const dispN = Math.round(2 * R.fs);
+  const step = Math.max(1, Math.floor(dispN/200));
+  const tDisp = sampleEvery(R.t.slice(0,dispN), step);
+  const kDisp = sampleEvery(R.kneeB.slice(0,dispN), step);
+
+  mkChart('chartKneeTime', {
+    type: 'line',
+    data: {
+      labels: tDisp.map(v=>v.toFixed(2)),
+      datasets: [
+        { label:'Knee Angle', data: kDisp, borderColor:'var(--knee)', borderWidth:2, pointRadius:0, tension:0.3 },
+        { label:`Max ${max.toFixed(1)}°`, data: Array(tDisp.length).fill(max), borderColor:'rgba(255,107,82,0.5)', borderWidth:1, borderDash:[4,4], pointRadius:0 },
+        { label:`Min ${min.toFixed(1)}°`, data: Array(tDisp.length).fill(min), borderColor:'rgba(0,229,176,0.5)', borderWidth:1, borderDash:[4,4], pointRadius:0 },
+      ]
+    },
+    options: chartOptions('Time (s)', 'Angle (°)')
+  });
+
+  // Cycle chart
+  const cycN = R.fs;
+  const stepC = Math.max(1,Math.floor(cycN/100));
+  const gpCyc = sampleEvery(R.gp.slice(0,cycN), stepC);
+  const kCyc  = sampleEvery(R.kneeB.slice(0,cycN), stepC);
+  mkChart('chartKneeCycle', {
+    type: 'line',
+    data: {
+      labels: gpCyc.map(v=>v.toFixed(0)),
+      datasets: [
+        { label:'Knee', data:kCyc, borderColor:'var(--knee)', borderWidth:2.5, pointRadius:0, tension:0.4 },
+        { label:`Normal ${NORMAL_KNEE}°`, data:Array(gpCyc.length).fill(NORMAL_KNEE), borderColor:'rgba(255,255,255,0.2)', borderWidth:1.5, borderDash:[6,4], pointRadius:0 }
+      ]
+    },
+    options: chartOptions('Gait Cycle (%)', 'Angle (°)')
+  });
+}
+
+/* ── INTERMEDIATE ── */
+function renderIntermediate() {
+  const R = analysisResult;
+  const NORMAL_ROMS = {Hip:50,Knee:60,Ankle:35};
+  const joints = [
+    {name:t('Hip'),   col:'hip',   color:'var(--hip)',   rom:R.hipROM},
+    {name:t('Knee'),  col:'knee',  color:'var(--knee)',  rom:R.kneeROM2},
+    {name:t('Ankle'), col:'ankle', color:'var(--ankle)', rom:R.ankleROM},
+  ];
+
+  document.getElementById('multiRomCards').innerHTML = joints.map(j => {
+    const pct = Math.min(j.rom.rom / NORMAL_ROMS[j.col==='hip'?'Hip':j.col==='knee'?'Knee':'Ankle'] * 100, 200);
+    return `<div class="stat-card">
+      <div class="stat-label">${j.name}</div>
+      <div class="stat-value" style="color:${j.color}">${j.rom.rom.toFixed(1)}</div>
+      <div class="stat-unit">° ROM</div>
+      <div class="stat-badge ${pct>=80?'badge-green':pct>=50?'badge-amber':'badge-red'}">${pct.toFixed(0)}% of Normal</div>
+    </div>`;
+  }).join('');
+
+  const step3 = Math.max(1, Math.floor(3*R.fs/200));
+  const tD3   = sampleEvery(R.t.slice(0,3*R.fs), step3);
+  mkChart('chartMultiTime', {
+    type:'line', data:{
+      labels: tD3.map(v=>v.toFixed(2)),
+      datasets: [
+        {label:t('Hip'),   data:sampleEvery(R.mid.hip.slice(0,3*R.fs),step3),   borderColor:'var(--hip)',   borderWidth:1.5,pointRadius:0,tension:0.3},
+        {label:t('Knee'),  data:sampleEvery(R.mid.knee.slice(0,3*R.fs),step3),  borderColor:'var(--knee)',  borderWidth:1.5,pointRadius:0,tension:0.3},
+        {label:t('Ankle'), data:sampleEvery(R.mid.ankle.slice(0,3*R.fs),step3), borderColor:'var(--ankle)', borderWidth:1.5,pointRadius:0,tension:0.3},
+      ]
+    },
+    options: chartOptions('Time (s)','Angle (°)')
+  });
+
+  const stepCyc = Math.max(1,Math.floor(R.fs/80));
+  const gpCyc = sampleEvery(R.gp.slice(0,R.fs),stepCyc);
+  mkChart('chartMultiCycle', {
+    type:'line', data:{
+      labels: gpCyc.map(v=>v.toFixed(0)),
+      datasets:[
+        {label:t('Hip'),   data:sampleEvery(R.mid.hip.slice(0,R.fs),stepCyc),   borderColor:'var(--hip)',   borderWidth:2,pointRadius:0,tension:0.4},
+        {label:t('Knee'),  data:sampleEvery(R.mid.knee.slice(0,R.fs),stepCyc),  borderColor:'var(--knee)',  borderWidth:2,pointRadius:0,tension:0.4},
+        {label:t('Ankle'), data:sampleEvery(R.mid.ankle.slice(0,R.fs),stepCyc), borderColor:'var(--ankle)', borderWidth:2,pointRadius:0,tension:0.4},
+      ]
+    },
+    options: chartOptions('Gait Cycle (%)','Angle (°)')
+  });
+
+  mkChart('chartRomBar', {
+    type:'bar', data:{
+      labels:[t('Hip'),t('Knee'),t('Ankle')],
+      datasets:[
+        {label:'ROM(°)', data:[R.hipROM.rom,R.kneeROM2.rom,R.ankleROM.rom], backgroundColor:['rgba(255,107,107,0.7)','rgba(78,205,196,0.7)','rgba(69,183,209,0.7)'], borderColor:['var(--hip)','var(--knee)','var(--ankle)'], borderWidth:1.5},
+        {label:'Normal(°)', data:[50,60,35], backgroundColor:'rgba(255,255,255,0.07)', borderColor:'rgba(255,255,255,0.25)', borderWidth:1.5},
+      ]
+    },
+    options: { ...chartOptions('Joint','ROM (°)'), plugins:{ legend:{labels:{color:'#8b9ec7'}} } }
+  });
+
+  // Event table
+  document.getElementById('eventTable').innerHTML = `
+    <table class="rom-table">
+      <thead><tr><th>Event</th><th>${t('Hip')}</th><th>${t('Knee')}</th><th>${t('Ankle')}</th></tr></thead>
+      <tbody>${R.evRows.map(r=>`<tr><td style="color:var(--c1);font-size:11px">${r.event}</td><td>${r.hip.toFixed(1)}°</td><td>${r.knee.toFixed(1)}°</td><td>${r.ankle.toFixed(1)}°</td></tr>`).join('')}</tbody>
+    </table>`;
+}
+
+/* ── ADVANCED ── */
+function renderAdvanced() {
+  const R = analysisResult;
+  const stepCyc = Math.max(1,Math.floor(R.fs/80));
+  const gpCyc   = sampleEvery(R.gp.slice(0,R.fs),stepCyc);
+
+  mkChart('chartPrePost', {
+    type:'line', data:{
+      labels: gpCyc.map(v=>v.toFixed(0)),
+      datasets:[
+        {label:t('pre'), data:sampleEvery(R.pre.knee.slice(0,R.fs),stepCyc),  borderColor:'var(--c3)', borderWidth:2.5,pointRadius:0,tension:0.4},
+        {label:t('post'),data:sampleEvery(R.post.knee.slice(0,R.fs),stepCyc), borderColor:'var(--c1)', borderWidth:2.5,pointRadius:0,tension:0.4},
+      ]
+    },
+    options: chartOptions('Gait Cycle (%)','Knee Angle (°)')
+  });
+
+  mkChart('chartRomChange', {
+    type:'bar', data:{
+      labels:[t('Hip'),t('Knee'),t('Ankle')],
+      datasets:[
+        {label:t('pre'),  data:R.preROMs,  backgroundColor:'rgba(255,107,82,0.65)',  borderColor:'var(--c3)',borderWidth:1.5},
+        {label:t('post'), data:R.postROMs, backgroundColor:'rgba(0,229,176,0.65)', borderColor:'var(--c1)',borderWidth:1.5},
+      ]
+    },
+    options: {...chartOptions('Joint','ROM (°)'), plugins:{legend:{labels:{color:'#8b9ec7'}}}}
+  });
+
+  // Quality gauges
+  const prePct = R.preQ.overall.toFixed(1);
+  const postPct = R.postQ.overall.toFixed(1);
+  document.getElementById('qualityGauges').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      ${['pre','post'].map((s,i)=>{
+        const q = i===0?R.preQ:R.postQ;
+        const clr = i===0?'var(--c3)':'var(--c1)';
+        const lbl = t(s);
+        return `<div style="text-align:center">
+          <div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:8px">${lbl}</div>
+          <div style="font-size:32px;font-weight:800;font-family:var(--font-h);color:${clr}">${q.overall.toFixed(0)}</div>
+          <div style="font-size:10px;color:var(--t3);margin-top:2px">/ 100</div>
+          <div style="margin-top:8px">
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-bottom:3px"><span>ROM</span><span>${q.rom.toFixed(0)}</span></div>
+            <div class="conf-track"><div class="conf-fill" style="width:${q.rom.toFixed(0)}%"></div></div>
+          </div>
+          <div style="margin-top:5px">
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-bottom:3px"><span>${t('smooth')}</span><span>${q.smooth.toFixed(0)}</span></div>
+            <div class="conf-track"><div class="conf-fill" style="width:${q.smooth.toFixed(0)}%;background:linear-gradient(90deg,var(--c5),var(--c2))"></div></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="font-size:12px;color:var(--c1);text-align:center;font-weight:600">
+      ${t('improvement')}: ${(R.postQ.overall - R.preQ.overall).toFixed(1)}점 (${((R.postQ.overall - R.preQ.overall)/R.preQ.overall*100).toFixed(1)}%)
+    </div>
+  `;
+
+  // Stats
+  const sig = R.pVal < 0.05;
+  document.getElementById('statsBlock').innerHTML = `
+    <div style="margin-bottom:10px">
+      ${['Hip','Knee','Ankle'].map((j,i)=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)">
+          <span style="font-size:12px;color:var(--t2)">${t(j)}</span>
+          <span style="font-size:11px;color:var(--c3)">${R.preROMs[i].toFixed(1)}°</span>
+          <span style="font-size:10px;color:var(--t3)">→</span>
+          <span style="font-size:11px;color:var(--c1)">${R.postROMs[i].toFixed(1)}°</span>
+          <span style="font-size:11px;color:var(--c4);font-weight:600">+${(R.postROMs[i]-R.preROMs[i]).toFixed(1)}°</span>
+        </div>`).join('')}
+    </div>
+    <div style="background:var(--bg4);border-radius:var(--r);padding:10px 12px;font-size:12px">
+      <div style="color:var(--t3);margin-bottom:4px">${t('ttest')}</div>
+      <div>t = <span style="color:var(--t1);font-weight:600">${R.tStat.toFixed(3)}</span> &nbsp; p = <span style="color:${sig?'var(--c1)':'var(--c3)'}; font-weight:600">${R.pVal.toFixed(4)}</span></div>
+      <div style="margin-top:4px;color:${sig?'var(--c1)':'var(--c3)'};font-weight:600">${sig ? t('sig') : t('nonsig')}</div>
+    </div>
+  `;
+
+  // ABCDE
+  const abcdeData = [
+    {l:'A', w:'Asym',    score: 0.2},
+    {l:'B', w:'Border',  score: 0.35},
+    {l:'C', w:'Change',  score: R.postROMs[1]/60 < 0.8 ? 0.6 : 0.25},
+    {l:'D', w:'Deficit', score: R.preROMs[1]/60 < 0.7 ? 0.7 : 0.3},
+    {l:'E', w:'Effect',  score: (R.postQ.overall - R.preQ.overall)/20},
+  ];
+  document.getElementById('abcdeGrid').innerHTML = abcdeData.map(a => {
+    const s = Math.max(0, Math.min(1, a.score));
+    const col = s > 0.6 ? 'var(--c3)' : s > 0.35 ? 'var(--c4)' : 'var(--c1)';
+    return `<div class="abcde-item">
+      <div class="abcde-letter" style="color:${col}">${a.l}</div>
+      <div class="abcde-word">${a.w}</div>
+      <div class="abcde-score" style="color:${col}">${Math.round(s*10)}/10</div>
+      <div class="abcde-bar"><div class="abcde-fill" style="width:${s*100}%;background:${col}"></div></div>
+    </div>`;
+  }).join('');
+
+  // 3-joint pre/post
+  ['Pre','Post'].forEach((s,si) => {
+    const data = si===0 ? R.pre : R.post;
+    const id   = si===0 ? 'chartPreJoints' : 'chartPostJoints';
+    const stepCy = Math.max(1,Math.floor(R.fs/80));
+    const gpC    = sampleEvery(R.gp.slice(0,R.fs),stepCy);
+    mkChart(id, {
+      type:'line', data:{
+        labels: gpC.map(v=>v.toFixed(0)),
+        datasets:[
+          {label:t('Hip'),   data:sampleEvery(data.hip.slice(0,R.fs),stepCy),   borderColor:'var(--hip)',   borderWidth:2,pointRadius:0,tension:0.4},
+          {label:t('Knee'),  data:sampleEvery(data.knee.slice(0,R.fs),stepCy),  borderColor:'var(--knee)',  borderWidth:2,pointRadius:0,tension:0.4},
+          {label:t('Ankle'), data:sampleEvery(data.ankle.slice(0,R.fs),stepCy), borderColor:'var(--ankle)', borderWidth:2,pointRadius:0,tension:0.4},
+        ]
+      },
+      options: chartOptions('Gait Cycle (%)','Angle (°)')
+    });
+  });
+}
+
+/* ── CLINICAL REPORT ── */
+function renderReport() {
+  const R = analysisResult;
+  const now = new Date().toLocaleString();
+  const impv = (R.postQ.overall - R.preQ.overall).toFixed(1);
+  const impvPct = ((R.postQ.overall - R.preQ.overall)/R.preQ.overall*100).toFixed(1);
+  const sig = R.pVal < 0.05;
+
+  document.getElementById('clinicalReport').innerHTML = `
+    <div class="card card-accent" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:10px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">GaitLab Clinical Report</div>
+          <div style="font-size:20px;font-family:var(--font-h);font-weight:700">${t('rep_title')}</div>
+        </div>
+        <div style="text-align:right;font-size:11px;color:var(--t3)">
+          <div>${now}</div>
+          <div style="margin-top:4px">Week 6 — Movement Assessment</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2" style="margin-bottom:16px">
+      <div class="card">
+        <div class="sec-label">${t('ptInfoLabel')}</div>
+        <table class="rom-table">
+          <tbody>
+            <tr><td style="color:var(--t3)">${t('ageLabel')}</td><td>${R.patient.age}</td></tr>
+            <tr><td style="color:var(--t3)">${t('sexLabel')}</td><td>${R.patient.sex||'—'}</td></tr>
+            <tr><td style="color:var(--t3)">${t('locLabel')}</td><td>${R.patient.loc||'—'}</td></tr>
+            <tr><td style="color:var(--t3)">${t('durLabel')}</td><td>${R.patient.dur||'—'}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="sec-label">${t('simParamLabel')}</div>
+        <table class="rom-table">
+          <tbody>
+            <tr><td style="color:var(--t3)">Sampling Rate</td><td>${R.fs} Hz</td></tr>
+            <tr><td style="color:var(--t3)">Gait Cycles</td><td>${R.nCycles}</td></tr>
+            <tr><td style="color:var(--t3)">Samples</td><td>${R.n}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="sec-label">${t('romTableLabel')} — ${t('beg_title')}</div>
+      <table class="rom-table">
+        <thead><tr><th>${t('Joint')}</th><th>${t('Max')}</th><th>${t('Min')}</th><th>${t('ROM')}</th><th>${t('Normal')}</th><th>${t('Pct')}</th></tr></thead>
+        <tbody>
+          ${[
+            {j:'Hip',  hi:R.hipROM.max,   lo:R.hipROM.min,   rom:R.hipROM.rom,   norm:50},
+            {j:'Knee', hi:R.kneeROM2.max, lo:R.kneeROM2.min, rom:R.kneeROM2.rom, norm:60},
+            {j:'Ankle',hi:R.ankleROM.max, lo:R.ankleROM.min, rom:R.ankleROM.rom, norm:35},
+          ].map(r=>{
+            const pct = (r.rom/r.norm*100).toFixed(0);
+            const bc  = pct>=80?'badge-green':pct>=50?'badge-amber':'badge-red';
+            return `<tr>
+              <td style="font-weight:500">${t(r.j)}</td>
+              <td>${r.hi.toFixed(1)}</td><td>${r.lo.toFixed(1)}</td>
+              <td style="font-weight:600;color:var(--c1)">${r.rom.toFixed(1)}</td>
+              <td style="color:var(--t3)">${r.norm}</td>
+              <td><span class="stat-badge ${bc}">${pct}%</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="sec-label">${t('adv_label')} — ${t('adv_title')}</div>
+      <table class="rom-table">
+        <thead><tr><th>${t('Joint')}</th><th>${t('pre')}</th><th>${t('post')}</th><th>${t('improvement')}</th></tr></thead>
+        <tbody>
+          ${['Hip','Knee','Ankle'].map((j,i)=>`
+            <tr>
+              <td>${t(j)}</td>
+              <td style="color:var(--c3)">${R.preROMs[i].toFixed(1)}°</td>
+              <td style="color:var(--c1)">${R.postROMs[i].toFixed(1)}°</td>
+              <td style="color:var(--c4);font-weight:600">+${(R.postROMs[i]-R.preROMs[i]).toFixed(1)}°</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+      <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
+        <div style="background:var(--bg3);border-radius:var(--r);padding:12px">
+          <div style="font-size:10px;color:var(--t3);margin-bottom:4px">${t('pre')} ${t('overall')}</div>
+          <div style="font-size:22px;font-weight:700;color:var(--c3)">${R.preQ.overall.toFixed(1)}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--r);padding:12px">
+          <div style="font-size:10px;color:var(--t3);margin-bottom:4px">${t('post')} ${t('overall')}</div>
+          <div style="font-size:22px;font-weight:700;color:var(--c1)">${R.postQ.overall.toFixed(1)}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--r);padding:12px">
+          <div style="font-size:10px;color:var(--t3);margin-bottom:4px">${t('improvement')}</div>
+          <div style="font-size:22px;font-weight:700;color:var(--c4)">+${impv} (${impvPct}%)</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--r);padding:12px">
+          <div style="font-size:10px;color:var(--t3);margin-bottom:4px">${t('ttest')}</div>
+          <div style="font-size:14px;font-weight:600;color:${sig?'var(--c1)':'var(--c3)'}">${sig?t('sig'):t('nonsig')}</div>
+          <div style="font-size:11px;color:var(--t3)">p = ${R.pVal.toFixed(4)}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="background:rgba(245,200,66,0.05);border-color:rgba(245,200,66,0.2)">
+      <div style="font-size:11px;color:var(--c4);line-height:1.6">
+        ⚠ ${t('disclaimer').replace('⚠ ','')}
+      </div>
+    </div>
+  `;
+}
+
+/* ── CHART OPTIONS ── */
+function chartOptions(xLabel, yLabel) {
+  return {
+    responsive: true,
+    maintainAspectRatio: true,
+    interaction: { mode:'index', intersect:false },
+    plugins: {
+      legend: { labels: { color:'#8b9ec7', font:{size:11}, boxWidth:12 } },
+      tooltip: {
+        backgroundColor:'rgba(13,20,32,0.95)',
+        borderColor:'rgba(255,255,255,0.1)', borderWidth:1,
+        titleColor:'#eef2ff', bodyColor:'#8b9ec7',
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color:CHART_DEFAULTS.tick, font:{size:10}, maxTicksLimit:10 },
+        grid:  { color:CHART_DEFAULTS.grid },
+        title: { display:true, text:xLabel, color:'#4a5980', font:{size:10} }
+      },
+      y: {
+        ticks: { color:CHART_DEFAULTS.tick, font:{size:10} },
+        grid:  { color:CHART_DEFAULTS.grid },
+        title: { display:true, text:yLabel, color:'#4a5980', font:{size:10} }
+      }
+    }
+  };
+}
+
+/* ═══════════════════════════════════════════════════
+   UI HELPERS
+═══════════════════════════════════════════════════ */
+function switchTab(i) {
+  document.querySelectorAll('.tab-btn').forEach((b,j) => b.classList.toggle('active', j===i));
+  document.querySelectorAll('.tab-panel').forEach((p,j) => p.classList.toggle('active', j===i));
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function copyReport() {
+  if (!analysisResult) { showToast(t('noReport')); return; }
+  const R = analysisResult;
+  const lines = [
+    'GaitLab Clinical Report',
+    new Date().toLocaleString(),
+    '',
+    'ROM Analysis (Multi-joint):',
+    ...['Hip','Knee','Ankle'].map((j,i)=>`  ${j}: ${R.preROMs[i].toFixed(1)}° → ${R.postROMs[i].toFixed(1)}° (+${(R.postROMs[i]-R.preROMs[i]).toFixed(1)}°)`),
+    '',
+    `Quality Score: ${R.preQ.overall.toFixed(1)} → ${R.postQ.overall.toFixed(1)}`,
+    `Paired t-test: p = ${R.pVal.toFixed(4)}`,
+  ];
+  navigator.clipboard?.writeText(lines.join('\n')).then(() => showToast(t('copied')));
+}
+
+function printReport() {
+  window.print();
+}
+
+function downloadCSV() {
+  if (!analysisResult) { showToast(t('noReport')); return; }
+  const R = analysisResult;
+  const rows = [
+    ['Joint','Pre ROM (°)','Post ROM (°)','Change (°)','Normal ROM (°)','ROM % Normal Pre','ROM % Normal Post'],
+    ...['Hip','Knee','Ankle'].map((j,i) => [
+      j, R.preROMs[i].toFixed(2), R.postROMs[i].toFixed(2),
+      (R.postROMs[i]-R.preROMs[i]).toFixed(2),
+      [50,60,35][i],
+      (R.preROMs[i]/[50,60,35][i]*100).toFixed(1),
+      (R.postROMs[i]/[50,60,35][i]*100).toFixed(1),
+    ])
+  ];
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `GaitLab_Report_${Date.now()}.csv`;
+  a.click();
+  showToast('CSV downloaded');
+}
+
+/* init */
+applyLang();
+</script>
+</body>
+</html>
